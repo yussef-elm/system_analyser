@@ -6,6 +6,7 @@
 # ADD: Cleanup of worker threads after data fetching
 # UPDATED: Responsive Plotly charts, legend-based curve toggle/isolate, fullscreen-friendly modebar,
 #    and hover popups with From → To ranges for Weekly, 3 Days, Monthly (works for all views)
+# FIXED: Replaced customdata2 with single combined customdata array
 
 from __future__ import annotations
 
@@ -272,8 +273,8 @@ def fetch_rates_data(
             completed += 1
             if STREAMLIT_AVAILABLE and progress_bar is not None:
                 progress_bar.progress(completed / len(periods))
-            if status_text is not None:
-                status_text.text(f"Fetching data... ({completed}/{len(periods)}) - {len(all_errors)} errors")
+                if status_text is not None:
+                    status_text.text(f"Fetching data... ({completed}/{len(periods)}) - {len(all_errors)} errors")
 
     # After executor exits, threads should be done. Best-effort cleanup:
     touched = cleanup_threads()
@@ -721,8 +722,8 @@ def _display_ui(result: Dict):
                     <p style="margin: 0; opacity: 0.9; color: white;">Total Concretized: {int(bcon['concretized_total']):,}</p>
                 </div>
                 """, unsafe_allow_html=True)
-    
-    st.markdown("")
+        
+        st.markdown("")
 
     df_combined = _combined_dataframe(df)
 
