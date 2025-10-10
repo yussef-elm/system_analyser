@@ -3,6 +3,7 @@
 # + Visualization: combined chart and per-center charts with ONLY rate curves
 # + Best performing centers cards
 # FIXED: All Streamlit calls now happen in main thread only
+# ADD: Cleanup of worker threads after data fetching
 
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from typing import List, Dict, Tuple
 import json
 import time
 import concurrent.futures
-from threading import Lock
+import threading
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -26,6 +27,7 @@ MAX_RETRIES = 3
 RETRY_DELAY = 2
 RATE_LIMIT_DELAY = 0.3  # Reduced delay for faster processing
 MAX_WORKERS = 10  # Number of parallel workers
+EXECUTOR_THREAD_PREFIX = "rates-worker"
 
 try:
     import streamlit as st
@@ -60,11 +62,9 @@ def _parse_percent(val) -> float:
             v = val.strip()
             if v.endswith('%'):
                 return float(v[:-1])
-            # string number - detect if likely 0..1 or 0..100
             fv = float(v)
         else:
             fv = float(val)
-        # Heuristic: if <= 1.5 assume ratio (0..1), convert to %
         return fv * 100.0 if fv <= 1.5 else fv
     except Exception:
         return 0.0
@@ -188,6 +188,27 @@ def fetch_period_wrapper(args):
     return fetch_with_retry(period_start, period_end, centers, label)
 
 
+def cleanup_threads(prefix: str = EXECUTOR_THREAD_PREFIX) -> int:
+    """
+    Best-effort cleanup: mark any lingering worker threads with a given prefix as daemon
+    so they cannot keep the app alive. Returns the number of threads touched.
+    Note: Python cannot forcibly kill threads; using ThreadPoolExecutor within a 'with'
+    block ensures threads should end naturally after work completes.
+    """
+    touched = 0
+    for t in threading.enumerate():
+        if t is threading.current_thread():
+            continue
+        name = getattr(t, "name", "")
+        if name.startswith(prefix) and not t.daemon:
+            try:
+                t.daemon = True
+                touched += 1
+            except Exception:
+                pass
+    return touched
+
+
 def fetch_rates_data(
     selected_centers: List[str],
     start_date: date,
@@ -221,7 +242,11 @@ def fetch_rates_data(
     fetch_args = [(ps, pe, label, selected_centers) for ps, pe, label in periods]
 
     # Run parallel fetching (workers don't call Streamlit)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+    # IMPORTANT: thread_name_prefix helps us identify threads for cleanup
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=MAX_WORKERS,
+        thread_name_prefix=EXECUTOR_THREAD_PREFIX
+    ) as executor:
         future_to_label = {executor.submit(fetch_period_wrapper, args): args[2] for args in fetch_args}
         completed = 0
         
@@ -247,6 +272,11 @@ def fetch_rates_data(
                 progress_bar.progress(completed / len(periods))
                 if status_text is not None:
                     status_text.text(f"Fetching data... ({completed}/{len(periods)}) - {len(all_errors)} errors")
+
+    # After executor exits, threads should be done. Best-effort cleanup:
+    touched = cleanup_threads()
+    if STREAMLIT_AVAILABLE and touched and status_text is not None:
+        status_text.info(f"Cleaned up {touched} worker thread(s).")
 
     # Clean up progress indicators (main thread)
     if STREAMLIT_AVAILABLE:
@@ -303,7 +333,6 @@ def _results_to_dataframe(periods: List[Dict]) -> pd.DataFrame:
             elif isinstance(data.get('data'), list):
                 items = data['data']
             else:
-                # maybe direct center keyed dict
                 items = list(data.values()) if any(isinstance(v, dict) for v in data.values()) else []
         else:
             items = data  # assume list
@@ -312,7 +341,6 @@ def _results_to_dataframe(periods: List[Dict]) -> pd.DataFrame:
             if not isinstance(item, dict):
                 continue
 
-            # Try multiple possible center name keys
             center = (
                 item.get('centerName')
                 or item.get('name')
@@ -321,10 +349,8 @@ def _results_to_dataframe(periods: List[Dict]) -> pd.DataFrame:
                 or "Unknown"
             )
 
-            # metrics may be nested or at top level
             metrics = item.get('metrics') if isinstance(item.get('metrics'), dict) else item
 
-            # counts - UPDATED FIELD NAMES
             confirmed = _safe_int(
                 metrics.get('num_confirmed', metrics.get('confirmed', metrics.get('confirmations', 0)))
             )
@@ -335,7 +361,6 @@ def _results_to_dataframe(periods: List[Dict]) -> pd.DataFrame:
                 metrics.get('num_concretise', metrics.get('concretized', metrics.get('conversions', 0)))
             )
 
-            # rates - UPDATED FIELD NAMES TO MATCH YOUR API
             rates = metrics.get('rates') if isinstance(metrics.get('rates'), dict) else {}
             confirmed_rate = _parse_percent(
                 rates.get('confirmation_rate', 
@@ -370,7 +395,6 @@ def _results_to_dataframe(periods: List[Dict]) -> pd.DataFrame:
 
     df = pd.DataFrame(rows)
     if not df.empty:
-        # force numeric
         for c in ['confirmed', 'showed', 'concretized',
                   'confirmed_rate', 'showed_rate', 'concretized_rate']:
             df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
@@ -379,11 +403,6 @@ def _results_to_dataframe(periods: List[Dict]) -> pd.DataFrame:
     return df
 
 def _combined_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Aggregate across centers per bucket:
-    - summed counts
-    - average rates across centers
-    """
     if df is None or df.empty:
         return pd.DataFrame()
 
@@ -402,9 +421,6 @@ def _combined_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _get_best_centers(df: pd.DataFrame) -> Dict:
-    """
-    Calculate average rates per center and return best performers.
-    """
     if df is None or df.empty:
         return {}
     
@@ -430,7 +446,6 @@ def _get_best_centers(df: pd.DataFrame) -> Dict:
 
 
 def _make_combined_chart(df_combined: pd.DataFrame, view_type: str) -> go.Figure:
-    """Combined chart with ONLY rate curves - no bars"""
     title = f"All Centers - {view_type} Rates"
 
     fig = go.Figure()
@@ -440,7 +455,6 @@ def _make_combined_chart(df_combined: pd.DataFrame, view_type: str) -> go.Figure
 
     x = df_combined['bucket_label']
 
-    # Only rates as lines
     fig.add_trace(go.Scatter(
         x=x, y=df_combined['confirmed_rate_avg'], name='Confirmed Rate',
         mode='lines+markers', 
@@ -481,7 +495,6 @@ def _make_combined_chart(df_combined: pd.DataFrame, view_type: str) -> go.Figure
 
 
 def _make_center_chart(center_name: str, df_center: pd.DataFrame, view_type: str) -> go.Figure:
-    """Per-center chart with ONLY rate curves - no bars"""
     title = f"{center_name} - {view_type} Rates"
     fig = go.Figure()
 
@@ -492,7 +505,6 @@ def _make_center_chart(center_name: str, df_center: pd.DataFrame, view_type: str
     df_center = df_center.sort_values('bucket_idx')
     x = df_center['bucket_label']
 
-    # Only rates lines
     fig.add_trace(go.Scatter(
         x=x, y=df_center['confirmed_rate'], name='Confirmed Rate',
         mode='lines+markers', 
@@ -570,7 +582,6 @@ def show(
 def _display_ui(result: Dict):
     st.title("📊 Rates Analysis")
 
-    # Errors and meta
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         st.metric("View", result["view_type"])
@@ -595,10 +606,8 @@ def _display_ui(result: Dict):
         st.error(result["error"])
         return
 
-    # Build DataFrames for charts
     df = _results_to_dataframe(result["periods"])
     
-    # Debug info
     if STREAMLIT_AVAILABLE:
         with st.expander("🔍 Debug Info - Data Sample", expanded=False):
             if df.empty:
@@ -629,7 +638,6 @@ def _display_ui(result: Dict):
             st.code(json.dumps(result, indent=2, default=str), language="json")
         return
 
-    # Best performing centers cards
     best_centers = _get_best_centers(df)
     if best_centers:
         st.subheader("🏆 Best Performing Centers")
@@ -678,7 +686,6 @@ def _display_ui(result: Dict):
 
     df_combined = _combined_dataframe(df)
 
-    # Combined chart
     st.subheader("Overall Performance")
     st.plotly_chart(
         _make_combined_chart(df_combined, result["view_type"]), 
@@ -686,7 +693,6 @@ def _display_ui(result: Dict):
         config={"displayModeBar": False}
     )
 
-    # Combined summary
     if not df_combined.empty:
         avg_conf_rate = df_combined['confirmed_rate_avg'].mean()
         avg_show_rate = df_combined['showed_rate_avg'].mean()
@@ -703,7 +709,6 @@ def _display_ui(result: Dict):
 
     st.markdown("")
 
-    # Per-center charts
     st.subheader("By Center")
     centers = sorted(df['centerName'].unique())
     cols = st.columns(2)
@@ -715,7 +720,6 @@ def _display_ui(result: Dict):
                 use_container_width=True,
                 config={"displayModeBar": False}
             )
-            # Small per-center summary
             if not df_c.empty:
                 s_conf = int(df_c['confirmed'].sum())
                 s_show = int(df_c['showed'].sum())
@@ -729,6 +733,5 @@ def _display_ui(result: Dict):
                     f"Concretized: {s_conc:,} ({avg_conc:.2f}%)"
                 )
 
-    # Raw JSON tab
     with st.expander("📄 Complete JSON"):
         st.code(json.dumps(result, indent=2, default=str), language="json")

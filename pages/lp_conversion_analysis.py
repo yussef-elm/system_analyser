@@ -363,10 +363,13 @@ def show(selected_centers, start_date, end_date, access_token, view_type: str = 
     # Rank best performing centers (Top 3 by avg LP Conv)
     top3, all_stats = _rank_best_centers(df_points)
 
+# ...existing code...
+
     st.subheader("🏆 Top LP Conversion Performers")
     if top3.empty:
         st.info("No center performance available for the selected range/view.")
     else:
+        # Responsive cards with margin-bottom
         cols = st.columns(3) if len(top3) >= 3 else st.columns(len(top3))
         gradients = [
             "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
@@ -375,19 +378,34 @@ def show(selected_centers, start_date, end_date, access_token, view_type: str = 
         ]
         medals = ["🥇", "🥈", "🥉"]
 
+        card_css = """
+        <style>
+        .lpconv-card {
+            background: VAR_BG;
+            padding: 18px;
+            border-radius: 12px;
+            color: white;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+            margin-bottom: 18px;
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        @media (max-width: 900px) {
+            .lpconv-card { min-height: 120px; font-size: 15px; }
+        }
+        </style>
+        """
+        st.markdown(card_css, unsafe_allow_html=True)
+
         for i, (_, row) in enumerate(top3.iterrows()):
             bg = gradients[i % len(gradients)]
             medal = medals[i] if i < len(medals) else "🏅"
             with cols[i]:
                 st.markdown(
                     f"""
-                    <div style="
-                        background: {bg};
-                        padding: 18px;
-                        border-radius: 12px;
-                        color: white;
-                        box-shadow: 0 6px 14px rgba(0,0,0,0.12);
-                    ">
+                    <div class="lpconv-card" style="background: {bg};">
                         <div style="font-size: 22px; margin-bottom: 6px;">{medal} {row['centerName']}</div>
                         <div style="font-size: 28px; font-weight: 700; margin-bottom: 8px;">
                             {row['avg_lpconv']:.2f}% LP Conv
@@ -399,6 +417,9 @@ def show(selected_centers, start_date, end_date, access_token, view_type: str = 
                     """,
                     unsafe_allow_html=True
                 )
+
+    # Add margin below the cards and above the expander
+    st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 
     # Optional: full stats table for transparency
     with st.expander("All centers ranking (Avg LP Conv)", expanded=False):
@@ -412,6 +433,8 @@ def show(selected_centers, start_date, end_date, access_token, view_type: str = 
                 }),
                 use_container_width=True
             )
+
+# ...existing code...
 
     st.markdown("")
 

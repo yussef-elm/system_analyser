@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime, timedelta
 import base64, hmac, hashlib, json
+import logging
 from config import CENTERS, CUSTOM_CSS, ACCESS_TOKEN
 
 # Import only required page modules
@@ -9,6 +10,32 @@ from pages import (
     lp_conversion_analysis,
     rates_analysis
 )
+
+# ---------- Page config should be set ASAP (before any output) ----------
+st.set_page_config(page_title="System Analyser", page_icon="🧠", layout="wide")
+
+# Suppress noisy Streamlit thread/context warnings in logs
+logging.getLogger("streamlit.runtime.scriptrunner.script_runner").setLevel(logging.ERROR)
+
+# Apply CSS
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+# Hide Streamlit menu, footer, header, sidebar navigation, and sidebar header
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    section[data-testid="stSidebarNav"] {display: none !important;}
+    [data-testid="stSidebarHeader"] {display: none !important;}
+    .st-emotion-cache-zy6yx3 {
+        width: 100% !important;
+        padding: 1rem 1rem 2rem !important;
+        max-width: initial !important;
+        min-width: auto !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # ========== Cookie Utilities ==========
 COOKIE_NAME = "sda_auth"
@@ -100,7 +127,8 @@ def sync_cookie_to_session(name: str):
     </script>
     """
     with ph.container():
-        _ = st.text_input("", key=f"_cookie_probe_{name}", label_visibility="collapsed", help=None)
+        # Use a non-empty label and collapse it to avoid the accessibility warning
+        _ = st.text_input("Cookie Sync", key=f"_cookie_probe_{name}", label_visibility="collapsed", help=None)
         st.markdown(f"""<input type="text" data-cookie-probe="{name}" style="display:none" />""", unsafe_allow_html=True)
         st.markdown(js, unsafe_allow_html=True)
     val = st.session_state.get(f"_cookie_probe_{name}")
@@ -200,29 +228,6 @@ def logout():
 
 # ---------- Auth first ----------
 check_login()
-
-# ---------- Page config (after we know we're logged in) ----------
-st.set_page_config(page_title="System Analyser", page_icon="🧠", layout="wide")
-
-# Apply CSS
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
-# Hide Streamlit menu, footer, header, sidebar navigation, and sidebar header
-st.markdown("""
-    <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    [data-testid="stSidebarNav"] {display: none !important;}
-    [data-testid="stSidebarHeader"] {display: none !important;}
-    .st-emotion-cache-zy6yx3 {
-        width: 100% !important;
-        padding: 1rem 1rem 2rem !important;
-        max-width: initial !important;
-        min-width: auto !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
 # Header
 st.title("🧠 System Data Analyser")
