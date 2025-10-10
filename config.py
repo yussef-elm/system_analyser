@@ -223,3 +223,12 @@ CUSTOM_CSS = """
     }
 </style>
 """
+
+# Benchmark definitions with classic colors
+BENCHMARKS = {
+    'confirmation': {'excellent': 60, 'good': 40, 'colors': ['#28a745', '#ffc107', '#dc3545']},  # Green, Yellow, Red
+    'show_up': {'excellent': 50, 'good': 35, 'colors': ['#28a745', '#ffc107', '#dc3545']},
+    'conversion': {'excellent': 50, 'good': 30, 'colors': ['#28a745', '#ffc107', '#dc3545']},
+    'cancellation': {'excellent': 30, 'good': 40, 'colors': ['#28a745', '#ffc107', '#dc3545'], 'reverse': True},
+    'no_answer': {'excellent': 30, 'good': 40, 'colors': ['#28a745', '#ffc107', '#dc3545'], 'reverse': True}
+}
