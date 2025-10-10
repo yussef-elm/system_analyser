@@ -5,7 +5,7 @@
 # FIXED: All Streamlit calls now happen in main thread only
 # ADD: Cleanup of worker threads after data fetching
 # UPDATED: Responsive Plotly charts, legend-based curve toggle/isolate, fullscreen-friendly modebar,
-#          and hover popups with From → To ranges for Weekly, 3 Days, Monthly (works for all views)
+#    and hover popups with From → To ranges for Weekly, 3 Days, Monthly (works for all views)
 
 from __future__ import annotations
 
@@ -272,8 +272,8 @@ def fetch_rates_data(
             completed += 1
             if STREAMLIT_AVAILABLE and progress_bar is not None:
                 progress_bar.progress(completed / len(periods))
-                if status_text is not None:
-                    status_text.text(f"Fetching data... ({completed}/{len(periods)}) - {len(all_errors)} errors")
+            if status_text is not None:
+                status_text.text(f"Fetching data... ({completed}/{len(periods)}) - {len(all_errors)} errors")
 
     # After executor exits, threads should be done. Best-effort cleanup:
     touched = cleanup_threads()
@@ -366,18 +366,18 @@ def _results_to_dataframe(periods: List[Dict]) -> pd.DataFrame:
             rates = metrics.get('rates') if isinstance(metrics.get('rates'), dict) else {}
             confirmed_rate = _parse_percent(
                 rates.get('confirmation_rate', 
-                         metrics.get('confirmation_rate',
-                                   metrics.get('confirmed_rate')))
+                          metrics.get('confirmation_rate',
+                                      metrics.get('confirmed_rate')))
             )
             showed_rate = _parse_percent(
                 rates.get('show_up_rate',
-                         metrics.get('show_up_rate',
-                                   metrics.get('showed_rate')))
+                          metrics.get('show_up_rate',
+                                      metrics.get('showed_rate')))
             )
             concretized_rate = _parse_percent(
                 rates.get('conversion_rate',
-                         metrics.get('conversion_rate',
-                                   metrics.get('concretized_rate')))
+                          metrics.get('conversion_rate',
+                                      metrics.get('concretized_rate')))
             )
 
             rows.append({
@@ -482,39 +482,41 @@ def _make_combined_chart(df_combined: pd.DataFrame, view_type: str) -> go.Figure
     x = df_combined['bucket_label']
     hover_x = _period_hover_labels(x, df_combined)
 
+    # Build combined customdata arrays (each row = [hover_label, count])
+    customdata_confirmed = list(zip(hover_x, df_combined['confirmed_sum']))
+    customdata_showed = list(zip(hover_x, df_combined['showed_sum']))
+    customdata_concretized = list(zip(hover_x, df_combined['concretized_sum']))
+
     fig.add_trace(go.Scatter(
         x=x, y=df_combined['confirmed_rate_avg'], name='Confirmed Rate',
         mode='lines+markers',
         line=dict(color='#1f77b4', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{customdata}</b><br>Confirmed Rate: <b>%{y:.2f}%</b><br>Confirmed Count: %{customdata2:,}<extra></extra>',
-        customdata=hover_x,
-        customdata2=df_combined['confirmed_sum'],
+        hovertemplate='<b>%{customdata[0]}</b><br>Confirmed Rate: <b>%{y:.2f}%</b><br>Confirmed Count: %{customdata[1]:,}<extra></extra>',
+        customdata=customdata_confirmed,
     ))
     fig.add_trace(go.Scatter(
         x=x, y=df_combined['showed_rate_avg'], name='Showed Rate',
         mode='lines+markers',
         line=dict(color='#2ca02c', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{customdata}</b><br>Showed Rate: <b>%{y:.2f}%</b><br>Showed Count: %{customdata2:,}<extra></extra>',
-        customdata=hover_x,
-        customdata2=df_combined['showed_sum'],
+        hovertemplate='<b>%{customdata[0]}</b><br>Showed Rate: <b>%{y:.2f}%</b><br>Showed Count: %{customdata[1]:,}<extra></extra>',
+        customdata=customdata_showed,
     ))
     fig.add_trace(go.Scatter(
         x=x, y=df_combined['concretized_rate_avg'], name='Concretized Rate',
         mode='lines+markers',
         line=dict(color='#d62728', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{customdata}</b><br>Concretized Rate: <b>%{y:.2f}%</b><br>Concretized Count: %{customdata2:,}<extra></extra>',
-        customdata=hover_x,
-        customdata2=df_combined['concretized_sum'],
+        hovertemplate='<b>%{customdata[0]}</b><br>Concretized Rate: <b>%{y:.2f}%</b><br>Concretized Count: %{customdata[1]:,}<extra></extra>',
+        customdata=customdata_concretized,
     ))
 
     fig.update_layout(
         title=title,
         hovermode='x unified',
         autosize=True,   # responsive
-        height=None,     # let container control height
+        height=None,    # let container control height
         margin=dict(t=70, b=50, l=50, r=30),
         plot_bgcolor='#f8f9fa',
         paper_bgcolor='white',
@@ -537,32 +539,34 @@ def _make_center_chart(center_name: str, df_center: pd.DataFrame, view_type: str
     x = df_center['bucket_label']
     hover_x = _period_hover_labels(x, df_center)
 
+    # Build combined customdata arrays (each row = [hover_label, count])
+    customdata_confirmed = list(zip(hover_x, df_center['confirmed']))
+    customdata_showed = list(zip(hover_x, df_center['showed']))
+    customdata_concretized = list(zip(hover_x, df_center['concretized']))
+
     fig.add_trace(go.Scatter(
         x=x, y=df_center['confirmed_rate'], name='Confirmed Rate',
         mode='lines+markers',
         line=dict(color='#1f77b4', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{customdata}</b><br>Confirmed Rate: <b>%{y:.2f}%</b><br>Count: %{customdata2:,}<extra></extra>',
-        customdata=hover_x,
-        customdata2=df_center['confirmed'],
+        hovertemplate='<b>%{customdata[0]}</b><br>Confirmed Rate: <b>%{y:.2f}%</b><br>Count: %{customdata[1]:,}<extra></extra>',
+        customdata=customdata_confirmed,
     ))
     fig.add_trace(go.Scatter(
         x=x, y=df_center['showed_rate'], name='Showed Rate',
         mode='lines+markers',
         line=dict(color='#2ca02c', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{customdata}</b><br>Showed Rate: <b>%{y:.2f}%</b><br>Count: %{customdata2:,}<extra></extra>',
-        customdata=hover_x,
-        customdata2=df_center['showed'],
+        hovertemplate='<b>%{customdata[0]}</b><br>Showed Rate: <b>%{y:.2f}%</b><br>Count: %{customdata[1]:,}<extra></extra>',
+        customdata=customdata_showed,
     ))
     fig.add_trace(go.Scatter(
         x=x, y=df_center['concretized_rate'], name='Concretized Rate',
         mode='lines+markers',
         line=dict(color='#d62728', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{customdata}</b><br>Concretized Rate: <b>%{y:.2f}%</b><br>Count: %{customdata2:,}<extra></extra>',
-        customdata=hover_x,
-        customdata2=df_center['concretized'],
+        hovertemplate='<b>%{customdata[0]}</b><br>Concretized Rate: <b>%{y:.2f}%</b><br>Count: %{customdata[1]:,}<extra></extra>',
+        customdata=customdata_concretized,
     ))
 
     fig.update_layout(
@@ -717,8 +721,8 @@ def _display_ui(result: Dict):
                     <p style="margin: 0; opacity: 0.9; color: white;">Total Concretized: {int(bcon['concretized_total']):,}</p>
                 </div>
                 """, unsafe_allow_html=True)
-        
-        st.markdown("")
+    
+    st.markdown("")
 
     df_combined = _combined_dataframe(df)
 
