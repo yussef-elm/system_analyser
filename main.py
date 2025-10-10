@@ -26,13 +26,17 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    section[data-testid="stSidebarNav"] {display: none !important;}
+    [data-testid="stSidebarNav"] {display: none !important;}
     [data-testid="stSidebarHeader"] {display: none !important;}
     .st-emotion-cache-zy6yx3 {
         width: 100% !important;
         padding: 1rem 1rem 2rem !important;
         max-width: initial !important;
         min-width: auto !important;
+    }
+    /* Add top margin to Markdown containers */
+    [data-testid="stMarkdownContainer"] {
+        margin-top: 10px !important;
     }
     </style>
 """, unsafe_allow_html=True)
