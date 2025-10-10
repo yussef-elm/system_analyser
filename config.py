@@ -79,15 +79,6 @@ CENTERS = [
         "businessId": "act_2508632876144425"
     },
     {
-        "apiKey": st.secrets["CENTRE_BE_SALAM_API_KEY"],
-        "locationId": "UL3W2ab5fakmXHeJ9aFd",
-        "city": "Casablanca",
-        "centerName": "Centre Be Salam",
-        "pipelineName": "Nouveau Pipeline",
-        "calendarId": "5M1g3Rpl0aAQHbPGf2B5",
-        "businessId": "act_3974524579468467"
-    },
-    {
         "apiKey": st.secrets["KRASOTKA_BEAUTY_API_KEY"],
         "locationId": "bWGWs4ePd1Ma8TT1H33q",
         "city": "Casablanca",
@@ -121,7 +112,7 @@ CENTERS = [
         "centerName": "Elixir",
         "pipelineName": "ELIXIR PIPELINE",
         "calendarId": "sk4EYCbwf0WxP7xF9DsT",
-        "businessId": "act_1026380249209164"
+        "businessId": "act_168644802797286"
     }
 ]
 

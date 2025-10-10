@@ -4,6 +4,8 @@
 # + Best performing centers cards
 # FIXED: All Streamlit calls now happen in main thread only
 # ADD: Cleanup of worker threads after data fetching
+# UPDATED: Responsive Plotly charts, legend-based curve toggle/isolate, fullscreen-friendly modebar,
+#          and hover popups with From → To ranges for Weekly, 3 Days, Monthly (works for all views)
 
 from __future__ import annotations
 
@@ -402,6 +404,7 @@ def _results_to_dataframe(periods: List[Dict]) -> pd.DataFrame:
         df = df.sort_values(['centerName', 'bucket_idx']).reset_index(drop=True)
     return df
 
+
 def _combined_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
@@ -445,6 +448,29 @@ def _get_best_centers(df: pd.DataFrame) -> Dict:
     }
 
 
+def _period_hover_labels(labels: pd.Series | list, df_like: pd.DataFrame) -> list:
+    """
+    Build hover labels that include period label and 'From → To' dates.
+    Requires df_like to have bucket_start, bucket_end columns aligned to labels.
+    """
+    if isinstance(df_like, pd.DataFrame):
+        starts = df_like.get('bucket_start', pd.Series([""] * len(df_like)))
+        ends = df_like.get('bucket_end', pd.Series([""] * len(df_like)))
+    else:
+        starts = [""] * len(labels)
+        ends = [""] * len(labels)
+
+    hover = []
+    for i, lab in enumerate(labels):
+        s = starts.iloc[i] if isinstance(starts, pd.Series) else starts[i]
+        e = ends.iloc[i] if isinstance(ends, pd.Series) else ends[i]
+        if s and e:
+            hover.append(f"{lab}<br><b>{s}</b> → <b>{e}</b>")
+        else:
+            hover.append(f"{lab}")
+    return hover
+
+
 def _make_combined_chart(df_combined: pd.DataFrame, view_type: str) -> go.Figure:
     title = f"All Centers - {view_type} Rates"
 
@@ -454,42 +480,47 @@ def _make_combined_chart(df_combined: pd.DataFrame, view_type: str) -> go.Figure
         return fig
 
     x = df_combined['bucket_label']
+    hover_x = _period_hover_labels(x, df_combined)
 
     fig.add_trace(go.Scatter(
         x=x, y=df_combined['confirmed_rate_avg'], name='Confirmed Rate',
-        mode='lines+markers', 
+        mode='lines+markers',
         line=dict(color='#1f77b4', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{x}</b><br>Confirmed Rate: <b>%{y:.2f}%</b><br>Confirmed Count: %{customdata:,}<extra></extra>',
-        customdata=df_combined['confirmed_sum']
+        hovertemplate='<b>%{customdata}</b><br>Confirmed Rate: <b>%{y:.2f}%</b><br>Confirmed Count: %{customdata2:,}<extra></extra>',
+        customdata=hover_x,
+        customdata2=df_combined['confirmed_sum'],
     ))
     fig.add_trace(go.Scatter(
         x=x, y=df_combined['showed_rate_avg'], name='Showed Rate',
-        mode='lines+markers', 
+        mode='lines+markers',
         line=dict(color='#2ca02c', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{x}</b><br>Showed Rate: <b>%{y:.2f}%</b><br>Showed Count: %{customdata:,}<extra></extra>',
-        customdata=df_combined['showed_sum']
+        hovertemplate='<b>%{customdata}</b><br>Showed Rate: <b>%{y:.2f}%</b><br>Showed Count: %{customdata2:,}<extra></extra>',
+        customdata=hover_x,
+        customdata2=df_combined['showed_sum'],
     ))
     fig.add_trace(go.Scatter(
         x=x, y=df_combined['concretized_rate_avg'], name='Concretized Rate',
-        mode='lines+markers', 
+        mode='lines+markers',
         line=dict(color='#d62728', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{x}</b><br>Concretized Rate: <b>%{y:.2f}%</b><br>Concretized Count: %{customdata:,}<extra></extra>',
-        customdata=df_combined['concretized_sum']
+        hovertemplate='<b>%{customdata}</b><br>Concretized Rate: <b>%{y:.2f}%</b><br>Concretized Count: %{customdata2:,}<extra></extra>',
+        customdata=hover_x,
+        customdata2=df_combined['concretized_sum'],
     ))
 
     fig.update_layout(
         title=title,
         hovermode='x unified',
-        height=460,
+        autosize=True,   # responsive
+        height=None,     # let container control height
         margin=dict(t=70, b=50, l=50, r=30),
         plot_bgcolor='#f8f9fa',
         paper_bgcolor='white',
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
-        xaxis=dict(title='Period', showgrid=True, gridcolor='#e0e0e0'),
-        yaxis=dict(title='Rate (%)', rangemode='tozero', showgrid=True, gridcolor='#e0e0e0'),
+        xaxis=dict(title='Period', showgrid=True, gridcolor='#e0e0e0', automargin=True),
+        yaxis=dict(title='Rate (%)', rangemode='tozero', showgrid=True, gridcolor='#e0e0e0', automargin=True),
     )
     return fig
 
@@ -504,42 +535,47 @@ def _make_center_chart(center_name: str, df_center: pd.DataFrame, view_type: str
 
     df_center = df_center.sort_values('bucket_idx')
     x = df_center['bucket_label']
+    hover_x = _period_hover_labels(x, df_center)
 
     fig.add_trace(go.Scatter(
         x=x, y=df_center['confirmed_rate'], name='Confirmed Rate',
-        mode='lines+markers', 
+        mode='lines+markers',
         line=dict(color='#1f77b4', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{x}</b><br>Confirmed Rate: <b>%{y:.2f}%</b><br>Count: %{customdata:,}<extra></extra>',
-        customdata=df_center['confirmed']
+        hovertemplate='<b>%{customdata}</b><br>Confirmed Rate: <b>%{y:.2f}%</b><br>Count: %{customdata2:,}<extra></extra>',
+        customdata=hover_x,
+        customdata2=df_center['confirmed'],
     ))
     fig.add_trace(go.Scatter(
         x=x, y=df_center['showed_rate'], name='Showed Rate',
-        mode='lines+markers', 
+        mode='lines+markers',
         line=dict(color='#2ca02c', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{x}</b><br>Showed Rate: <b>%{y:.2f}%</b><br>Count: %{customdata:,}<extra></extra>',
-        customdata=df_center['showed']
+        hovertemplate='<b>%{customdata}</b><br>Showed Rate: <b>%{y:.2f}%</b><br>Count: %{customdata2:,}<extra></extra>',
+        customdata=hover_x,
+        customdata2=df_center['showed'],
     ))
     fig.add_trace(go.Scatter(
         x=x, y=df_center['concretized_rate'], name='Concretized Rate',
-        mode='lines+markers', 
+        mode='lines+markers',
         line=dict(color='#d62728', width=3),
         marker=dict(size=8),
-        hovertemplate='<b>%{x}</b><br>Concretized Rate: <b>%{y:.2f}%</b><br>Count: %{customdata:,}<extra></extra>',
-        customdata=df_center['concretized']
+        hovertemplate='<b>%{customdata}</b><br>Concretized Rate: <b>%{y:.2f}%</b><br>Count: %{customdata2:,}<extra></extra>',
+        customdata=hover_x,
+        customdata2=df_center['concretized'],
     ))
 
     fig.update_layout(
         title=title,
         hovermode='x unified',
-        height=430,
+        autosize=True,  # responsive
+        height=None,    # let container control height
         margin=dict(t=70, b=50, l=50, r=30),
         plot_bgcolor='#f8f9fa',
         paper_bgcolor='white',
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
-        xaxis=dict(title='Period', showgrid=True, gridcolor='#e0e0e0'),
-        yaxis=dict(title='Rate (%)', rangemode='tozero', showgrid=True, gridcolor='#e0e0e0'),
+        xaxis=dict(title='Period', showgrid=True, gridcolor='#e0e0e0', automargin=True),
+        yaxis=dict(title='Rate (%)', rangemode='tozero', showgrid=True, gridcolor='#e0e0e0', automargin=True),
     )
     return fig
 
@@ -688,9 +724,17 @@ def _display_ui(result: Dict):
 
     st.subheader("Overall Performance")
     st.plotly_chart(
-        _make_combined_chart(df_combined, result["view_type"]), 
+        _make_combined_chart(df_combined, result["view_type"]),
         use_container_width=True,
-        config={"displayModeBar": False}
+        config={
+            "displayModeBar": True,
+            "displaylogo": False,
+            "scrollZoom": True,
+            "responsive": True,
+            "modeBarButtonsToAdd": ["toImage", "zoom2d", "pan2d", "autoScale2d", "resetScale2d", "select2d", "lasso2d"],
+            "modeBarButtonsToRemove": [],
+            "showTips": False
+        }
     )
 
     if not df_combined.empty:
@@ -716,9 +760,17 @@ def _display_ui(result: Dict):
         df_c = df[df['centerName'] == center].copy()
         with cols[i % 2]:
             st.plotly_chart(
-                _make_center_chart(center, df_c, result["view_type"]), 
+                _make_center_chart(center, df_c, result["view_type"]),
                 use_container_width=True,
-                config={"displayModeBar": False}
+                config={
+                    "displayModeBar": True,
+                    "displaylogo": False,
+                    "scrollZoom": True,
+                    "responsive": True,
+                    "modeBarButtonsToAdd": ["toImage", "zoom2d", "pan2d", "autoScale2d", "resetScale2d", "select2d", "lasso2d"],
+                    "modeBarButtonsToRemove": [],
+                    "showTips": False
+                }
             )
             if not df_c.empty:
                 s_conf = int(df_c['confirmed'].sum())
