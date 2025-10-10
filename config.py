@@ -76,7 +76,7 @@ CENTERS = [
         "centerName": "Le Neuf Maroc",
         "pipelineName": "Nouveau Pipeline",
         "calendarId": "dnMc4WakoOzAwYQtT4um",
-        "businessId": "act_2508632876144425"
+        "businessId": "act_2961653874016169"
     },
     {
         "apiKey": st.secrets["KRASOTKA_BEAUTY_API_KEY"],
@@ -112,7 +112,7 @@ CENTERS = [
         "centerName": "Elixir",
         "pipelineName": "ELIXIR PIPELINE",
         "calendarId": "sk4EYCbwf0WxP7xF9DsT",
-        "businessId": "act_168644802797286"
+        "businessId": "act_1011271636962792"
     }
 ]
 
