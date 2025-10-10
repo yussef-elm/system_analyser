@@ -202,7 +202,7 @@ def logout():
 check_login()
 
 # ---------- Page config (after we know we're logged in) ----------
-st.set_page_config(page_title="System Data Analyser", page_icon="🧠", layout="wide")
+st.set_page_config(page_title="System Analyser", page_icon="🧠", layout="wide")
 
 # Apply CSS
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -213,17 +213,13 @@ st.markdown("""
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    section[data-testid="stSidebarNav"] {display: none !important;}
+    [data-testid="stSidebarNav"] {display: none !important;}
     [data-testid="stSidebarHeader"] {display: none !important;}
     </style>
 """, unsafe_allow_html=True)
 
-# Header with logout button
-col1, col2 = st.columns([4, 1])
-with col1:
-    st.title("🧠 System Data Analyser")
-with col2:
-    logout()
+# Header
+st.title("🧠 System Data Analyser")
 
 # --- Sidebar Filters ---
 with st.sidebar:
@@ -292,6 +288,20 @@ with st.sidebar:
         unsafe_allow_html=True
     )
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- Place logout button at the bottom of the sidebar ---
+    st.markdown(
+        """
+        <style>
+        div[data-testid="stSidebar"] > div:first-child { flex: 1 1 auto; }
+        .logout-bottom { position: absolute; bottom: 1.5rem; width: 90%; }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    st.markdown('<div class="logout-bottom">', unsafe_allow_html=True)
+    logout()
     st.markdown('</div>', unsafe_allow_html=True)
 
 access_token = ACCESS_TOKEN
