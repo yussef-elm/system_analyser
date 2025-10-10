@@ -124,3 +124,102 @@ CENTERS = [
         "businessId": "act_1026380249209164"
     }
 ]
+
+
+
+# Color constants
+COLORS = {
+    'GREEN': '#28a745',
+    'YELLOW': '#ffc107', 
+    'RED': '#dc3545',
+    'NEUTRAL': '#6c757d',
+    'PRIMARY': '#007bff',
+    'SECONDARY': '#6c757d'
+}
+
+# CSS Styling
+CUSTOM_CSS = """
+<style>
+    .main {
+        background-color: #f8f9fa;
+    }
+    .stApp {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    }
+    .metric-card {
+        background: white;
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid;
+        margin: 0.5rem 0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .metric-green { border-left-color: #28a745; }
+    .metric-yellow { border-left-color: #ffc107; }
+    .metric-red { border-left-color: #dc3545; }
+    .metric-neutral { border-left-color: #6c757d; }
+
+    .benchmark-legend {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin: 1rem 0;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .benchmark-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+
+    .benchmark-item {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 8px;
+        border-left: 3px solid #007bff;
+    }
+
+    /* Table styling for colored cells */
+    .colored-table {
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    .colored-table th, .colored-table td {
+        padding: 8px 12px;
+        text-align: left;
+        border: 1px solid #dee2e6;
+    }
+
+    .colored-table th {
+        background-color: #f8f9fa;
+        font-weight: bold;
+    }
+
+    .cell-green {
+        background-color: #d4edda !important;
+        color: #155724 !important;
+        font-weight: bold;
+    }
+
+    .cell-yellow {
+        background-color: #fff3cd !important;
+        color: #856404 !important;
+        font-weight: bold;
+    }
+
+    .cell-red {
+        background-color: #f8d7da !important;
+        color: #721c24 !important;
+        font-weight: bold;
+    }
+
+    .cell-neutral {
+        background-color: #f8f9fa !important;
+        color: #495057 !important;
+    }
+</style>
+"""
