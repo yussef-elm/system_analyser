@@ -13,31 +13,78 @@ def norm(s):
     """Normalize string for comparison"""
     return strip_accents(s).lower().strip()
 
+def normalize_stage(stage_name):
+    """
+    Map raw stage names from the pipeline to canonical keys used in metrics.
+    This is the primary function to use for stage normalization.
+    """
+    if not stage_name:
+        return ''
+    
+    s = norm(stage_name)
+    
+    # Explicit mappings for pipeline stages
+    mapping = {
+        # Original pipeline stages
+        'nouveau lead (en attente de confirmation)': 'non_confirme',
+        'rdv confirme (en cours)': 'confirme',
+        'rdv termine': 'present',
+        'rdv annule': 'annule',
+        'concretise (client)': 'concretise',
+        
+        # Additional explicit mappings
+        'message envoye (rdv non confirme)': 'non_confirme',
+        'reponse positive (rdv confirme)': 'confirme',
+        'reponse negative (rdv annule)': 'annule',
+        'presente cabinet': 'present',
+        'concretise': 'concretise',
+        'pas venus': 'pas_venu',
+        'pas venu': 'pas_venu',
+        'sans reponse': 'sans_reponse',
+        'unqualified': 'non_qualifie',
+        
+        # Common variations
+        'no show': 'pas_venu',
+        'no-show': 'pas_venu',
+        'database reactivation': 'excluded',
+    }
+    
+    # Check exact match first
+    if s in mapping:
+        return mapping[s]
+    
+    # Fallback to pattern-based canonical function
+    return canonical(stage_name)
+
 def canonical(name):
-    """Convert stage name to canonical form"""
+    """
+    Convert stage name to canonical form using pattern matching.
+    Note: Use normalize_stage() for primary stage normalization.
+    This function serves as a fallback for unmapped stages.
+    """
     n = norm(name)
 
     # Exclude Database Reactivation explicitly
     if 'database reactivation' in n:
         return 'excluded'
 
-    if 'annule' in n or 'réponse négative' in n:
+    if 'annule' in n or 'reponse negative' in n:
         return 'annule'
-    if 'pas venu' in n or 'pas venus' in n:
+    if 'pas venu' in n or 'pas venus' in n or 'no show' in n or 'no-show' in n:
         return 'pas_venu'
-    if 'concretise' in n or 'concrétisé' in n:
+    if 'concretise' in n:
         return 'concretise'
-    if 'present' in n or 'présenté cabinet' in n:
+    if 'present' in n or 'presente cabinet' in n or 'termine' in n:
         return 'present'
-    if 'non confirme' in n or 'message envoye' in n or 'message envoyé' in n:
+    if 'non confirme' in n or 'message envoye' in n:
         return 'non_confirme'
-    if 'rdv confirme' in n or 'rendez-vous confirme' in n or 'réponse positive' in n or 'reponse positive (rdv confirme)' in n:
+    if 'rdv confirme' in n or 'rendez-vous confirme' in n or 'reponse positive' in n or 'en cours' in n:
         return 'confirme'
-    if 'sans reponse' in n or 'sans réponse' in n or 'without answer' in n or 'voice mail' in n:
+    if 'sans reponse' in n or 'without answer' in n or 'voice mail' in n:
         return 'sans_reponse'
 
     # Additional mappings if needed
-    if 'unqualified' in n:
+    if 'unqualified' in n or 'non qualifie' in n:
         return 'non_qualifie'
     if 'double' in n:
         return 'double'
@@ -137,4 +184,4 @@ def pct_str(v, d):
     """Calculate percentage as string"""
     return f"{(v/d)*100:.1f}%" if d else "0%"
 
-EXCLUDED_STAGE_CANON = canonical('Database Reactivation')
+EXCLUDED_STAGE_CANON = 'excluded'
