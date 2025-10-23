@@ -113,6 +113,15 @@ CENTERS = [
         "pipelineName": "ELIXIR PIPELINE",
         "calendarId": "sk4EYCbwf0WxP7xF9DsT",
         "businessId": "act_1011271636962792"
+    },
+    {
+        "apiKey": st.secrets["EPILUX_API_KEY"],
+        "locationId": "fanvrRKlyTT1UmrVOI4u",
+        "city": "Casablanca",
+        "centerName": "Epilux",
+        "pipelineName": "Nouveau Pipeline",
+        "calendarId": "Tp1EJDYkAUYWivmqZuv1",
+        "businessId": "act_4028475507246924"
     }
 ]
 
