@@ -12,6 +12,7 @@ CONNECTOR_LIMIT = 100
 CONNECTOR_LIMIT_PER_HOST = 30
 REQUEST_TIMEOUT = 30
 
+
 async def fetch_all_opportunities(session, url_base, center):
     """Fetch all opportunities with pagination - optimized"""
     items = []
@@ -34,7 +35,7 @@ async def fetch_all_opportunities(session, url_base, center):
                 if response.status != 200:
                     st.error(f"Error fetching opportunities for {center['centerName']}: HTTP {response.status}")
                     break
-                
+
                 data = await response.json()
                 items.extend(data.get('opportunities', []))
 
@@ -53,6 +54,7 @@ async def fetch_all_opportunities(session, url_base, center):
 
     return items
 
+
 async def get_center_stats_base(session, center, start_datetime, end_datetime, date_field='updatedAt'):
     """Base function for getting center stats with configurable date field - optimized"""
     try:
@@ -63,7 +65,7 @@ async def get_center_stats_base(session, center, start_datetime, end_datetime, d
 
         # Fetch pipelines
         pipeline_url = 'https://rest.gohighlevel.com/v1/pipelines/'
-        
+
         async with session.get(pipeline_url, headers=headers, timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)) as response:
             if response.status != 200:
                 return {
@@ -91,7 +93,7 @@ async def get_center_stats_base(session, center, start_datetime, end_datetime, d
         opp_url = f"https://rest.gohighlevel.com/v1/pipelines/{target_pipeline['id']}/opportunities"
         all_opportunities = await fetch_all_opportunities(session, opp_url, center)
 
-        # Filter by date and enrich with stage info (optimized with list comprehension)
+        # Filter by date and enrich with stage info
         opp_filtered_by_date = []
         for opp in all_opportunities:
             date_value = opp.get(date_field)
@@ -114,7 +116,7 @@ async def get_center_stats_base(session, center, start_datetime, end_datetime, d
         # Filter out Database Reactivation for stage counting
         opp_filtered = [o for o in opp_filtered_by_date if o['stageCanonical'] != EXCLUDED_STAGE_CANON]
 
-        # Count by canonical stage - optimized with single pass
+        # Count by canonical stage
         stage_counts = {
             'annule': 0,
             'confirme': 0,
@@ -125,7 +127,7 @@ async def get_center_stats_base(session, center, start_datetime, end_datetime, d
             'non_qualifie': 0,
             'sans_reponse': 0
         }
-        
+
         for o in opp_filtered:
             stage = o['stageCanonical']
             if stage in stage_counts:
@@ -177,7 +179,7 @@ async def get_center_stats_base(session, center, start_datetime, end_datetime, d
             }
         }
 
-        # Stage stats - optimized
+        # Stage stats
         stageStats = {}
         for o in opp_filtered:
             stageCanonical = o['stageCanonical'] or 'unknown'
@@ -202,13 +204,16 @@ async def get_center_stats_base(session, center, start_datetime, end_datetime, d
             'error': str(e)
         }
 
+
 async def get_center_stats(session, center, start_datetime, end_datetime):
     """Get statistics for a single center (filtered by updatedAt)"""
     return await get_center_stats_base(session, center, start_datetime, end_datetime, 'updatedAt')
 
+
 async def get_center_stats_created(session, center, start_datetime, end_datetime):
     """Get statistics for a single center (filtered by createdAt)"""
     return await get_center_stats_base(session, center, start_datetime, end_datetime, 'createdAt')
+
 
 def _prepare_datetime_range(start_date_str, end_date_str):
     """Helper function to prepare datetime range"""
@@ -217,6 +222,7 @@ def _prepare_datetime_range(start_date_str, end_date_str):
     start_datetime = datetime.combine(start_date.date(), time.min).replace(tzinfo=timezone.utc)
     end_datetime = datetime.combine(end_date.date(), time.max).replace(tzinfo=timezone.utc)
     return start_datetime, end_datetime
+
 
 def _execute_async_tasks(tasks):
     """Helper function to execute async tasks with optimized connection pooling"""
@@ -228,7 +234,7 @@ def _execute_async_tasks(tasks):
             ttl_dns_cache=300
         )
         timeout = aiohttp.ClientTimeout(total=60, connect=10)
-        
+
         async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
             return await asyncio.gather(*tasks(session), return_exceptions=True)
 
@@ -243,6 +249,7 @@ def _execute_async_tasks(tasks):
 
     return loop.run_until_complete(fetch_all())
 
+
 @st.cache_data(ttl=300)
 def fetch_centers_data(start_date_str, end_date_str, selected_center_names):
     """Fetch data for selected centers (filtered by updatedAt)"""
@@ -255,6 +262,7 @@ def fetch_centers_data(start_date_str, end_date_str, selected_center_names):
         return [get_center_stats(session, center, start_datetime, end_datetime) for center in selected_centers]
 
     return _execute_async_tasks(create_tasks)
+
 
 @st.cache_data(ttl=300)
 def fetch_centers_data_created(start_date_str, end_date_str, selected_center_names):
@@ -269,12 +277,13 @@ def fetch_centers_data_created(start_date_str, end_date_str, selected_center_nam
 
     return _execute_async_tasks(create_tasks)
 
+
 # APPOINTMENTS FUNCTIONS
 async def fetch_appointments_from_calendar(session, center, calendar_id, start_date, end_date):
     """Fetch appointments from a single calendar within date range"""
     if not calendar_id:
         return []
-    
+
     try:
         start_epoch = int(datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc).timestamp() * 1000)
         end_epoch = int(datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc).timestamp() * 1000)
@@ -294,8 +303,10 @@ async def fetch_appointments_from_calendar(session, center, calendar_id, start_d
     except Exception:
         return []
 
+
 def get_date_from_iso(iso_string):
     return iso_string.split('T')[0] if iso_string else 'unknown'
+
 
 def merge_appointments_by_day(appointments):
     appointments_by_day = {}
@@ -310,16 +321,17 @@ def merge_appointments_by_day(appointments):
         appointments_by_day[date][status] = appointments_by_day[date].get(status, 0) + 1
     return appointments_by_day
 
+
 async def fetch_appointments(session, center, start_date, end_date):
     """Fetch appointments from one or two calendars for a center - parallel fetching"""
     # Fetch both calendars in parallel
     tasks = [fetch_appointments_from_calendar(session, center, center.get('calendarId'), start_date, end_date)]
-    
+
     if center.get('calendarId2'):
         tasks.append(fetch_appointments_from_calendar(session, center, center.get('calendarId2'), start_date, end_date))
-    
+
     results = await asyncio.gather(*tasks)
-    
+
     # Flatten results
     all_appointments = []
     for result in results:
@@ -336,6 +348,7 @@ async def fetch_appointments(session, center, start_date, end_date):
         'appointmentsByDay': appointments_by_day,
         'totalAppointments': len(all_appointments)
     }
+
 
 @st.cache_data(ttl=300)
 def fetch_appointments_for_centers(start_date_str, end_date_str, selected_center_names):
@@ -392,9 +405,10 @@ def fetch_appointments_for_centers(start_date_str, end_date_str, selected_center
 
     return results
 
+
 # META ADS FUNCTIONS
-async def fetch_meta_metrics(session, business_id, access_token, date_start, date_stop):
-    """Fetch Meta Ads metrics for a business account"""
+async def fetch_meta_metrics(session, business_id, access_token, date_start, date_stop, center):
+    """Fetch Meta Ads metrics for a business account with per-business lead action mapping"""
     url = f"https://graph.facebook.com/v21.0/{business_id}/insights"
 
     params = {
@@ -402,6 +416,20 @@ async def fetch_meta_metrics(session, business_id, access_token, date_start, dat
         "time_range": f"{{'since':'{date_start}','until':'{date_stop}'}}",
         "access_token": access_token
     }
+
+    # Determine which action_type to treat as leads for this center.
+    # You can replace this with a config-driven approach: center.get('leadActionType')
+    center_name_norm = (center.get('centerName') or '').strip().lower()
+    # Map rules
+    # - Epilux => count "post" as leads
+    # - Elixir => count "lead" as leads
+    if 'epilux' in center_name_norm:
+        lead_action_type = 'post'
+    elif 'elixir' in center_name_norm:
+        lead_action_type = 'lead'
+    else:
+        # default behavior: no special action_type counted as lead
+        lead_action_type = center.get('leadActionType') or None
 
     try:
         async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)) as response:
@@ -435,20 +463,24 @@ async def fetch_meta_metrics(session, business_id, access_token, date_start, dat
             landing_page_views = 0
             inline_link_clicks = int(insights.get("inline_link_clicks", 0))
 
-            # Extract leads from conversions (priority)
+            # 1) Leads from conversions (keeping the original logic)
             for conv in insights.get("conversions", []):
                 if conv.get("action_type") == "schedule_total":
                     leads += int(conv.get("value", 0))
 
-            # Extract actions
+            # 2) Leads from actions per-business mapping
             for act in insights.get("actions", []):
                 action_type = act.get("action_type")
-                
+
                 if inline_link_clicks == 0 and action_type == "link_click":
                     inline_link_clicks += int(act.get("value", 0))
-                
+
                 if action_type == "landing_page_view":
                     landing_page_views += int(act.get("value", 0))
+
+                # Count leads by mapped action_type, if configured
+                if lead_action_type and action_type == lead_action_type:
+                    leads += int(act.get("value", 0))
 
             # Extract 30s video views
             if "video_30_sec_watched_actions" in insights:
@@ -493,7 +525,8 @@ async def fetch_meta_metrics(session, business_id, access_token, date_start, dat
             "lp_conversion_rate": 0.0,
             "error": str(e)
         }
-       
+
+
 async def get_center_meta_stats(session, center, access_token, start_date_str, end_date_str):
     """Get Meta Ads statistics for a single center"""
     try:
@@ -521,11 +554,12 @@ async def get_center_meta_stats(session, center, access_token, start_date_str, e
 
         # Fetch Meta metrics
         metrics = await fetch_meta_metrics(
-            session, 
-            center['businessId'], 
-            access_token, 
-            start_date_str, 
-            end_date_str
+            session,
+            center['businessId'],
+            access_token,
+            start_date_str,
+            end_date_str,
+            center  # pass center for per-business lead mapping
         )
 
         return {
@@ -556,6 +590,7 @@ async def get_center_meta_stats(session, center, access_token, start_date_str, e
             }
         }
 
+
 @st.cache_data(ttl=300)
 def fetch_meta_metrics_for_centers(start_date_str, end_date_str, selected_center_names, access_token):
     """Fetch Meta Ads metrics for selected centers"""
@@ -565,11 +600,12 @@ def fetch_meta_metrics_for_centers(start_date_str, end_date_str, selected_center
 
     def create_tasks(session):
         return [
-            get_center_meta_stats(session, center, access_token, start_date_str, end_date_str) 
+            get_center_meta_stats(session, center, access_token, start_date_str, end_date_str)
             for center in selected_centers
         ]
 
     return _execute_async_tasks(create_tasks)
+
 
 @st.cache_data(ttl=300)
 def fetch_combined_performance_data(start_date_str, end_date_str, selected_center_names, access_token):
@@ -642,6 +678,7 @@ def fetch_combined_performance_data(start_date_str, end_date_str, selected_cente
 
     return combined_results
 
+
 def format_combined_data_for_display(combined_data):
     """Format combined data for display in Streamlit tables - returns raw numbers, no string formatting"""
     display_data = []
@@ -687,6 +724,7 @@ def format_combined_data_for_display(combined_data):
         display_data.append(formatted)
 
     return display_data
+
 
 def get_performance_summary(combined_data):
     """Get summary statistics for all centers"""
@@ -753,6 +791,7 @@ def get_performance_summary(combined_data):
     }
 
     return summary
+
 
 async def get_center_rates_kpis(session, center, start_datetime, end_datetime):
     """Get rates KPIs for a single center from opportunities pipeline"""
@@ -861,6 +900,7 @@ async def get_center_rates_kpis(session, center, start_datetime, end_datetime):
             'city': center['city'],
             'error': str(e)
         }
+
 
 @st.cache_data(ttl=300)
 def fetch_rates_kpis_for_centers(start_date_str, end_date_str, selected_center_names):
